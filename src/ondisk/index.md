@@ -12,7 +12,15 @@ The entire filesystem tree is built from just three core on-disk structures:
 - **Directory entries** — 12-byte records, sorted lexicographically
   within each directory block.
 
+Optional features extend this foundation without breaking the core design:
+
+- **{doc}`Extended attributes (xattrs) <xattrs>`** support per-inode metadata.
+  Several mechanisms — including a shared xattr pool, long prefix tables, and a
+  per-inode Bloom filter — keep storage overhead low even when xattrs are used
+  extensively.
+
 ```{toctree}
 :hidden:
 core_ondisk
+xattrs
 ```
