@@ -13,9 +13,9 @@ Code (GSoC) projects.
 
  - Stabilize liberofs APIs;
 
- - **\[GSoC\]** [Multi-threaded decompression](gsoc.md#multi_threaded_decompression);
+ - Virtual machine template feature support (memory + disk snapshots can be incrementally packed into multi-blob EROFS images);
 
- - Fanotify on-demand loading support (using fanotify pre-content hooks);
+ - **\[GSoC\]** [Multi-threaded decompression](gsoc.md#multi_threaded_decompression);
 
  - Rebuild improvements (including incremental updates [\[1\]](https://git.kernel.org/xiang/erofs-utils/c/7550a30c332c)).
 
