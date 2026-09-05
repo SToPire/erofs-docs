@@ -25,6 +25,7 @@ myst_enable_extensions = ["colon_fence"]
 myst_heading_anchors = 3
 
 templates_path = ['_templates']
+exclude_patterns = ['_static/erofs-explorer/*.md']
 
 # -- Options for HTML output
 
@@ -47,3 +48,25 @@ html_theme_options = {
 
 # -- Options for EPUB output
 epub_show_urls = 'footnote'
+epub_exclude_files = [
+    '_static/erofs-explorer/README.md',
+    '_static/erofs-explorer/explorer.js',
+    '_static/erofs-explorer/layouts.js',
+    '_static/erofs-explorer/documented-layouts.js',
+    '_static/erofs-explorer/recorded-layout.js',
+    '_static/erofs-explorer/recorded-images.js',
+    '_static/erofs-explorer/REAL-IMAGE.md',
+    '_static/erofs-explorer/xattr-variants.js',
+    '_static/erofs-explorer/chunk-variants.js',
+    '_static/erofs-explorer/COVERAGE.md',
+    '_static/erofs-explorer/explorer.css',
+]
+
+
+def use_explorer_template(app, pagename, templatename, context, doctree):
+    if app.builder.name == 'html' and pagename == 'ondisk/explorer':
+        return 'explorer.html'
+
+
+def setup(app):
+    app.connect('html-page-context', use_explorer_template)

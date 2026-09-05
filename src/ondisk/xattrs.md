@@ -6,6 +6,9 @@ EROFS supports Extended Attributes
 `name:value` pairs associated permanently with inodes since the initial Linux
 5.4 version.
 
+The [Layout Explorer](explorer.md) illustrates both inline and shared xattrs,
+including their placement between the inode body and its data or chunk indexes.
+
 ## Superblock Fields for Xattr Support
 
 The core superblock format is defined in {ref}`on_disk_superblock`. This
@@ -55,8 +58,8 @@ For xattr support, both inode variants share the same feature-specific field:
 
 Two storage classes exist:
 
-- **Inline xattrs**: stored directly in the metadata block immediately following
-  the inode body (and any inline data tail). They are private to the inode and
+- **Inline xattrs**: stored immediately after the inode body, before any inline
+  data tail or chunk indexes. They are private to the inode and
   encoded as a sequence of xattr entry records within the inline xattr region
   described by `i_xattr_icount`.
 - **Shared xattrs**: stored once in the global shared xattr area. An inode references
@@ -83,6 +86,11 @@ fixed size of the inline xattr body header. The region is structured as:
 1. The {ref}`inline_xattr_body_header` (12 bytes, fixed).
 2. `h_shared_count` × 4-byte shared xattr index values.
 3. Zero or more {ref}`xattr_entry_record` (inline entries).
+
+A body containing only one shared ID is valid: 12 header bytes plus 4 ID bytes,
+with `i_xattr_icount = 2`. A header-only 12-byte body (`i_xattr_icount = 1`) is
+not currently a supported readable form. Use a zero count when there are no
+xattrs.
 
 (inline_xattr_body_header)=
 ### Inline Xattr Body Header
@@ -135,7 +143,9 @@ after the 12-byte inline xattr header. The index is a byte offset within the
 shared area divided by 4.
 
 When `EROFS_FEATURE_COMPAT_SHARED_EA_IN_METABOX` is set, the shared xattr pool is
-stored in the metabox inode's decoded data region rather than at `xattr_blkaddr`.
+stored in the metabox inode's decoded data region. The same address formula,
+`xattr_blkaddr * block_size + shared_id * 4`, then gives an offset in that decoded
+region instead of a physical offset in the primary image.
 
 (long_xattr_prefixes)=
 ## Long Xattr Name Prefixes
@@ -167,10 +177,22 @@ For example, an xattr named `trusted.overlay.opaque` can be represented with
 (xattr_prefix_table_placement)=
 ### Prefix Table Placement
 
-The xattr prefix table start offset is recorded in `xattr_prefix_start`.
-The table may be:
-- embedded in the metabox or packed inode's data region when `EROFS_FEATURE_COMPAT_PLAIN_XATTR_PFX` is not set; or
-- stored in a standalone region when `EROFS_FEATURE_COMPAT_PLAIN_XATTR_PFX` is set.
+The xattr prefix table start is recorded in `xattr_prefix_start` in 4-byte units:
+its byte offset is `xattr_prefix_start * 4`.
+The table's address space is selected in this order:
+
+- With `EROFS_FEATURE_COMPAT_PLAIN_XATTR_PFX`, the offset is in the primary image,
+  even when a metabox exists.
+- Otherwise, when `EROFS_FEATURE_INCOMPAT_METABOX` is enabled, the offset is in
+  the metabox inode's decoded data stream.
+- Otherwise, a loaded packed inode supplies the decoded stream. Loading it
+  requires `EROFS_FEATURE_INCOMPAT_FRAGMENTS` and a nonzero `packed_nid`.
+- If neither special inode is present, the reader falls back to the primary
+  image's physical address space.
+
+Metabox use also requires a valid `metabox_nid` and a superblock extension large
+enough to contain that field (at least 144 bytes). See the
+[kernel prefix-table routing](https://github.com/torvalds/linux/blob/v6.18/fs/erofs/xattr.c#L470).
 
 (xattr_filter)=
 ## Xattr Filter
@@ -199,7 +221,15 @@ When these features are set, the superblock field `ishare_xattr_prefix_id` is va
 and identifies an entry in the long xattr prefix table. Regular files may carry an
 xattr whose name equals the prefix identified by `ishare_xattr_prefix_id`
 (i.e. `e_name_index` selects that entry and `e_name_len` is 0) and whose value is
-a SHA-256 content fingerprint in the form `sha256:<hex-digest>`.
+a content fingerprint. The current erofs-utils SHA-256 convention stores the
+7 ASCII bytes `sha256:` followed by the **32 raw digest bytes**, for 39 bytes
+total, not a 64-character hexadecimal digest. The resulting xattr entry occupies
+44 bytes after alignment. A tool may display the raw digest in hexadecimal
+without changing its on-disk size.
+
+This is the [erofs-utils encoding convention](https://kernel.googlesource.com/pub/scm/linux/kernel/git/xiang/erofs-utils/+/445301c848ee6882d24e59470c12009a12d75636/lib/inode.c);
+the [kernel fingerprint reader](https://github.com/torvalds/linux/blob/ff68e5f557f69a08fdcfa4ce8b1b809d63bd4f45/fs/erofs/xattr.c)
+treats the value as opaque bytes rather than requiring that textual encoding.
 
 This convention enables tools to identify files with identical content across
 different EROFS images by comparing these fingerprints.

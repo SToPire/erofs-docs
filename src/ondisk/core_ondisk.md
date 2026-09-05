@@ -95,8 +95,12 @@ reject any image whose first four bytes at offset 1024 do not match this value.
 ### Superblock Checksum
 
 When `EROFS_FEATURE_COMPAT_SB_CHKSUM` is set, the `checksum` field contains a
-CRC32-C digest. The digest is computed over the byte range `[1024, 1024 + block_size)`,
-with the four bytes of the `checksum` field itself treated as zero during computation.
+CRC32-C digest. The digest starts at byte offset 1024. Its length is
+`block_size - 1024` when
+`block_size > 1024`, and `block_size` otherwise. Thus a 4 KiB filesystem block
+uses the range `[1024, 4096)`, while 512-byte blocks use `[1024, 1536)`.
+The four bytes of the `checksum` field itself are treated as zero during
+computation. See the [kernel checksum implementation](https://github.com/torvalds/linux/blob/v6.18/fs/erofs/super.c#L37).
 
 > For example, when `blkszbits` is 12 (block size is 4 KiB):
 >
@@ -260,15 +264,15 @@ occupying `ceil(i_size / block_size)` consecutive blocks.
 `i_u` is interpreted as `startblk` (the 32-bit starting block address).
 
 The inode's data lies in consecutive blocks starting from that address, except
-for the tail part (`i_size % block_size`) that is inlined in the block
-immediately following the inode metadata. If `i_size` is small enough that the
-entire content fits in the inline tail, there are no preceding blocks and `i_u`
+for the tail part (`i_size % block_size`), which is stored immediately after
+the inode body and its inline xattr region, within a metadata block. If `i_size`
+is small enough that the entire content fits in the inline tail, there are no preceding blocks and `i_u`
 is a don't-care field.
 
 :::{note}
-This layout is not allowed if the tail inode data block cannot be inlined
-(e.g., if inlining the tail data would cause the inode to cross a physical
-block boundary).
+This layout is not allowed if the tail data cannot be inlined
+(e.g., if the inline tail itself would cross a physical block boundary).
+This constraint does not prohibit the inode body from spanning blocks.
 :::
 
 (on_disk_directories)=

@@ -33,6 +33,14 @@ Get Started
 
 FAQ
 ```
+
+```{button-ref} ondisk/explorer
+:ref-type: doc
+:color: secondary
+:class: sd-rounded-pill
+
+Explore the layout
+```
 ````
 
 ---

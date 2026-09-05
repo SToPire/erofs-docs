@@ -6,6 +6,9 @@ to a contiguous range of physical filesystem blocks. This format supports data
 deduplication and multi-device storage, allowing efficient data sharing among
 different inodes and images.
 
+In the [Layout Explorer](explorer.md), choose **Chunk-based** to inspect the
+address entries and follow them to their data chunks.
+
 ## Superblock Extension for Chunk-based Inodes and Multiple Devices
 
 The core superblock format is defined in {ref}`on_disk_superblock`. This
@@ -111,7 +114,7 @@ Each record contains:
 
 | Offset | Size | Type   | Name       | Description |
 |--------|------|--------|------------|-------------|
-| 0x00   | 64   | `u8[]` | `tag`      | User-specific identifier: The kernel never parses it in any form |
+| 0x00   | 64   | `u8[]` | `tag`      | Consumer-defined device tag, such as an identifier or device path |
 | 0x40   | 4    | `u32`  | `blocks`   | 32-bit total block count of this device |
 | 0x44   | 4    | `u32`  | `uniaddr`  | 32-bit unified starting block address of this device |
 | 0x48   | 4    | `u8[]` | _dontcare_ | 48-bit layout specific; ignored for basic chunk-based inodes |

@@ -1,6 +1,10 @@
 (erofs_ondisk_format)=
 # EROFS On-disk Format
 
+Explore the core structures in the **[Layout Explorer](explorer.md)**.
+Compare inode, data, device and extended-attribute variants and follow their
+field and address relationships.
+
 EROFS uses a flexible, hierarchical, block-aligned on-disk layout that is built
 with the following goals:
 
@@ -34,6 +38,7 @@ Optional features extend this foundation without breaking the core design:
 
 ```{toctree}
 :hidden:
+explorer
 core_ondisk
 xattrs
 chunked_format

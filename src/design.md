@@ -7,6 +7,9 @@ Readonly File System for Resource-scarce Devices](https://www.usenix.org/confere
 The details defined in the paper are slightly outdated but the overall ideas are
 nearly the same.
 
+The **[Layout Explorer](ondisk/explorer.md)** illustrates the core on-disk
+structures and how inode encoding and tail inlining affect their layout.
+
 ## Block-aligned vs unaligned
 
 EROFS data is all arranged in **fixed-size blocks** (aka. block-aligned,
