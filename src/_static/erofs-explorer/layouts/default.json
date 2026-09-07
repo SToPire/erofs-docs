@@ -1,0 +1,195 @@
+{
+  "id": "flat-inline",
+  "options": {
+    "format": "compact",
+    "blockSize": 4096,
+    "dataLayout": "flat",
+    "inline": true,
+    "chunkFormat": "blockmap",
+    "chunkBits": 0,
+    "deviceMode": "primary",
+    "sharing": false,
+    "xattrs": "none",
+    "xattrFilter": "off",
+    "prefixStorage": "off",
+    "ztailpacking": false,
+    "compressionIndex": "compact"
+  },
+  "tool": "mkfs.erofs (erofs-utils) 1.9.4",
+  "size": 16384,
+  "sha256": "3ed6b98384a6af6614d1a7b035b553ec6af9315245a83f8733b75f176d1ba9a3",
+  "superblock": "e2e1f5e0097064b8030000000c002400060000000000000000f1536500000000000000000400000000000000000000001111111122223333444455555555555500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "blockSize": 4096,
+  "metaBlock": 0,
+  "rootNid": 36,
+  "inodes": [
+    {
+      "id": "root-inode",
+      "key": "root",
+      "path": "/",
+      "nid": 36,
+      "start": 1152,
+      "bytes": "04000000ed4103003800000000000000ffffffff010000000000000000000000",
+      "size": 56,
+      "layout": 2,
+      "xattr": null,
+      "directory": {
+        "start": 1184,
+        "bytes": "2400000000000000300002002400000000000000310002002700000000000000330001004000000000000000340002002e2e2e61646f6373"
+      },
+      "chunks": null,
+      "data": [
+        {
+          "logical": 0,
+          "length": 56,
+          "start": 1184,
+          "space": "primary",
+          "inline": true
+        }
+      ],
+      "sha256": "3c2bafb18f10615cd14b7bcc560cd6b394054a4ec5299021ba99cb2bd409c9ca"
+    },
+    {
+      "id": "inode-a",
+      "key": "a",
+      "path": "/a",
+      "nid": 39,
+      "start": 1248,
+      "bytes": "04000000a48101000003000000000000ffffffff020000000000000000000000",
+      "size": 768,
+      "layout": 2,
+      "xattr": null,
+      "directory": null,
+      "chunks": null,
+      "data": [
+        {
+          "logical": 0,
+          "length": 768,
+          "start": 1280,
+          "space": "primary",
+          "inline": true
+        }
+      ],
+      "sha256": "72abbf9338e81a612c0a9d2def9540f3bfdee8cffe61b6de1f120524effb9338"
+    },
+    {
+      "id": "inode-docs",
+      "key": "docs",
+      "path": "/docs",
+      "nid": 64,
+      "start": 2048,
+      "bytes": "04000000ed4103003a00000000000000ffffffff030000000000000000000000",
+      "size": 58,
+      "layout": 2,
+      "xattr": null,
+      "directory": {
+        "start": 2080,
+        "bytes": "4000000000000000300002002400000000000000310002004300000000000000330002004600000000000000390001002e2e2e61737365747362"
+      },
+      "chunks": null,
+      "data": [
+        {
+          "logical": 0,
+          "length": 58,
+          "start": 2080,
+          "space": "primary",
+          "inline": true
+        }
+      ],
+      "sha256": "14bb134897e52f56a74086506c3d91696d08ca4b470d74b73ca56ec04e6ae7c4"
+    },
+    {
+      "id": "inode-assets",
+      "key": "assets",
+      "path": "/docs/assets",
+      "nid": 67,
+      "start": 2144,
+      "bytes": "04000000ed4102002800000000000000ffffffff040000000000000000000000",
+      "size": 40,
+      "layout": 2,
+      "xattr": null,
+      "directory": {
+        "start": 2176,
+        "bytes": "4300000000000000240002004000000000000000250002005700000000000000270001002e2e2e63"
+      },
+      "chunks": null,
+      "data": [
+        {
+          "logical": 0,
+          "length": 40,
+          "start": 2176,
+          "space": "primary",
+          "inline": true
+        }
+      ],
+      "sha256": "94e647d269e1d6cb5dd9ca66d27e0778bdecae6ccbbe7a3d8c329e438b3cdf94"
+    },
+    {
+      "id": "inode-c",
+      "key": "c",
+      "path": "/docs/assets/c",
+      "nid": 87,
+      "start": 2784,
+      "bytes": "04000000a4810100881300000000000003000000060000000000000000000000",
+      "size": 5000,
+      "layout": 2,
+      "xattr": null,
+      "directory": null,
+      "chunks": null,
+      "data": [
+        {
+          "logical": 0,
+          "length": 4096,
+          "start": 12288,
+          "space": "primary",
+          "inline": false
+        },
+        {
+          "logical": 4096,
+          "length": 904,
+          "start": 2816,
+          "space": "primary",
+          "inline": true
+        }
+      ],
+      "sha256": "50bf5787284ba30e518e3ef33b9a4539fb20be372d30dadffcaaa289fed5c390"
+    },
+    {
+      "id": "inode-b",
+      "key": "b",
+      "path": "/docs/b",
+      "nid": 70,
+      "start": 2240,
+      "bytes": "04000000a4810100002200000000000001000000050000000000000000000000",
+      "size": 8704,
+      "layout": 2,
+      "xattr": null,
+      "directory": null,
+      "chunks": null,
+      "data": [
+        {
+          "logical": 0,
+          "length": 8192,
+          "start": 4096,
+          "space": "primary",
+          "inline": false
+        },
+        {
+          "logical": 8192,
+          "length": 512,
+          "start": 2272,
+          "space": "primary",
+          "inline": true
+        }
+      ],
+      "sha256": "83e688e8a102d3f7a6fa508091d2b4745c3989dc287bbf63a677fd7769808167"
+    }
+  ],
+  "sharedXattrs": [],
+  "prefixes": null,
+  "deviceTable": null,
+  "blob": null,
+  "image": "00923.erofs",
+  "command": "mkfs.erofs -b4096 -T1700000000 --all-root --workers=1 -U11111111-2222-3333-4444-555555555555 '-Eforce-inode-compact,^xattr-name-filter' image.erofs source",
+  "source": "none-off"
+}

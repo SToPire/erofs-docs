@@ -46,20 +46,25 @@ html_theme_options = {
     "use_edit_page_button": True,
 }
 
+from pathlib import Path
+
 # -- Options for EPUB output
 epub_show_urls = 'footnote'
 epub_exclude_files = [
     '_static/erofs-explorer/README.md',
     '_static/erofs-explorer/explorer.js',
-    '_static/erofs-explorer/layouts.js',
     '_static/erofs-explorer/documented-layouts.js',
     '_static/erofs-explorer/recorded-layout.js',
-    '_static/erofs-explorer/recorded-images.js',
+    '_static/erofs-explorer/options.js',
+    '_static/erofs-explorer/layout-data.js',
+    '_static/erofs-explorer/compressed-layout.js',
     '_static/erofs-explorer/REAL-IMAGE.md',
-    '_static/erofs-explorer/xattr-variants.js',
-    '_static/erofs-explorer/chunk-variants.js',
     '_static/erofs-explorer/COVERAGE.md',
     '_static/erofs-explorer/explorer.css',
+]
+epub_exclude_files += [
+    f'_static/erofs-explorer/layouts/{path.name}'
+    for path in (Path(__file__).parent / '_static/erofs-explorer/layouts').glob('*.json')
 ]
 
 

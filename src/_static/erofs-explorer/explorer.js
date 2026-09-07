@@ -1,11 +1,12 @@
-import { createDocumentedLayout as createLayout, DEFAULT_OPTIONS } from './documented-layouts.js';
+import { createRecordedLayout as createLayout } from './recorded-layout.js';
+import { DEFAULT_OPTIONS, maxChunkBits, normalizeOptions } from './options.js';
 
 const $ = id => document.getElementById(id);
 const root = $('explorer');
 const grid = $('block-array');
 const dock = $('details-dock');
 const tooltip = $('region-tooltip');
-const kindNames = { superblock: 'SUPERBLOCK', inode: 'INODE', directory: 'DIRECTORY CONTENT', data: 'FILE DATA', inline: 'INLINE DATA', 'chunk-index': 'CHUNK ADDRESS TABLE', xattr: 'EXTENDED ATTRIBUTES', 'device-table': 'DEVICE TABLE', unused: 'UNUSED SPACE' };
+const kindNames = { superblock: 'SUPERBLOCK', inode: 'INODE', directory: 'DIRECTORY CONTENT', data: 'FILE DATA', inline: 'INLINE DATA', 'chunk-index': 'CHUNK ADDRESS TABLE', 'compressed-index': 'COMPRESSION INDEX', 'compressed-data': 'COMPRESSED DATA', xattr: 'EXTENDED ATTRIBUTES', 'device-table': 'DEVICE TABLE', unused: 'UNUSED SPACE' };
 const bytes = value => `${value.toLocaleString('en-US')} B`;
 const hex = value => `0x${value.toString(16).padStart(6, '0')}`;
 let layout;
@@ -17,6 +18,7 @@ let selectedFieldKey = null;
 let derivedRegions = new Map();
 let zoomFrame = null;
 let preferredOptions = { ...DEFAULT_OPTIONS };
+let loadVersion = 0;
 let activeSpace = 'primary';
 
 function element(tag, className, text) {
@@ -118,35 +120,25 @@ function renderDock() {
     $('mapping-section').hidden = !region.mapping;
     const mappingNodes = [];
     if (region.mapping) {
-        for (const [key, value] of Object.entries({ 'Logical range': `[${region.mapping.logical}, ${region.mapping.logical + region.mapping.length})`, 'Physical range': `[${hex(region.start)}, ${hex(region.start + region.size)})`, Storage: region.mapping.storage, Owner: region.mapping.owner })) {
+        for (const [key, value] of Object.entries({ 'Logical range': `[${region.mapping.logical}, ${region.mapping.logical + region.mapping.length})`, 'Logical length': bytes(region.mapping.length), 'Physical range': `[${hex(region.start)}, ${hex(region.start + region.size)})`, 'Stored length': bytes(region.mapping.physicalLength ?? region.size), Storage: region.mapping.storage, Owner: region.mapping.owner })) {
             mappingNodes.push(element('dt', '', key), element('dd', '', value));
         }
     }
     $('mapping-details').replaceChildren(...mappingNodes);
-    $('mapping-note').textContent = region.docPage === 'chunked_format'
-        ? 'Each chunk has an address entry. Logical neighbors need not be stored in adjacent physical blocks.'
-        : 'Flat files map directly from their inode. There is no separate file index table.';
+    $('mapping-note').textContent = region.docPage === 'compressed_format' || region.kind.startsWith('compressed-')
+        ? 'Compression indexes map logical file ranges to stored extents. Logical length and stored length are independent; stored extents may include compression padding.'
+        : region.docPage === 'chunked_format'
+            ? 'Each chunk has an address entry. Logical neighbors need not be stored in adjacent physical blocks.'
+            : 'Flat files map directly from their inode. There is no separate file index table.';
     $('dock-note').hidden = !region.note;
     $('dock-note').textContent = region.note || '';
     $('references-section').hidden = region.references.length === 0;
     $('dock-references').replaceChildren(...region.references.map(ref => referenceButton(ref.target, ref.label)));
-    const docUrls = { xattrs: root.dataset.docXattrs, chunked_format: root.dataset.docChunked };
+    const docUrls = { xattrs: root.dataset.docXattrs, chunked_format: root.dataset.docChunked, compressed_format: root.dataset.docCompressed };
     $('format-link').href = `${docUrls[region.docPage] || root.dataset.docUrl}#${region.doc || 'overview'}`;
 }
 function groups() {
-    if (layout.groups) return layout.groups.filter(group => (group.space || 'primary') === activeSpace);
-    return [
-        { id: 'prefix', title: 'Reserved prefix', label: 'Reserved', detail: '1024 B', start: 0, size: 1024, primary: 'reserved-prefix', kind: 'unused', weight: 0.82 },
-        { id: 'superblock', title: 'Superblock', label: 'Superblock', detail: '128 B', start: 1024, size: 128, primary: 'superblock', kind: 'superblock', weight: 1.13 },
-        { id: 'gap', title: 'Unused interval', label: '…', detail: '', start: 1152, size: 2944, primary: 'gap-1152', kind: 'unused', weight: 0.32 },
-        { id: 'root', title: 'Root directory', label: 'Root inode', detail: '+ directory', start: 4096, size: 4096, primary: 'root-inode', kind: 'directory', weight: 1.55 },
-        { id: 'a', title: 'File A region', label: 'Inode A', detail: '+ data', start: 8192, size: 8192, primary: 'inode-a', kind: 'inode', weight: 1.45 },
-        { id: 'b', title: 'File B region', label: 'Inode B', detail: '+ data', start: 16384, size: 16384, primary: 'inode-b', kind: 'inode', weight: 2 },
-        { id: 'c', title: 'File C region', label: 'Inode C', detail: '+ data', start: 32768, size: 12288, primary: 'inode-c', kind: 'inode', weight: 1.8 },
-        layout.xattrs === 'shared'
-            ? { id: 'shared', title: 'Shared xattrs', label: 'Shared', detail: 'xattrs', start: 45056, size: 4096, primary: 'xattr-shared', kind: 'xattr', weight: 0.75 }
-            : { id: 'unused', title: 'Unused interval', label: 'Unused', detail: '', start: 45056, size: 4096, primary: 'gap-45056', kind: 'unused', weight: 0.75 },
-    ];
+    return layout.groups.filter(group => (group.space || 'primary') === activeSpace);
 }
 function groupForRegion(region) {
     if ((region.space || 'primary') !== activeSpace) return null;
@@ -190,15 +182,12 @@ function renderSpaceTabs() {
     }));
     const space = spaceInfo();
     $('diagram-space-label').textContent = `${space.label || space.title || space.id} · ${layout.options.blockSize / 1024} KiB blocks${space.physical === false ? ' · decoded offsets' : ''}`;
-    $('layout-provenance').textContent = layout.provenance
-        ? `Recorded mkfs.erofs layout · ${layout.blockCount} blocks · ${bytes(space.size)} · ${layout.provenance.image}`
-        : 'Illustrative layout · this option combination is not recorded from an image.';
 }
 function makeDerivedRegions() {
     derivedRegions = new Map();
     function registerChildren(parent) {
         for (const child of parent.children || []) {
-            const item = { fields: [], references: [], docPage: parent.docPage, space: parent.space || 'primary', ...child, parent: child.parentId || parent.id };
+            const item = { fields: [], references: [], docPage: parent.docPage, doc: parent.doc, space: parent.space || 'primary', ...child, parent: child.parentId || parent.id };
             derivedRegions.set(item.id, item);
             registerChildren(item);
         }
@@ -270,7 +259,7 @@ function renderDiagram() {
     renderSpaceTabs();
     const space = spaceInfo();
     const overview = layer(space.physical === false ? `${space.label} (logical)` : activeSpace === 'primary' ? 'EROFS filesystem' : space.label,
-        space.physical === false ? 'Decoded byte offsets →' : layout.provenance ? 'Recorded image · physical byte offsets →' : 'Illustrative arrangement · physical byte offsets →', 'layout-overview');
+        space.physical === false ? 'Decoded byte offsets →' : 'Recorded image · physical byte offsets →', 'layout-overview');
     const group = groups().find(group => group.id === activeGroupId);
     for (const item of groups()) {
         const button = element('button', 'overview-segment');
@@ -344,7 +333,7 @@ function renderDiagram() {
         } else {
             const bytesNode = element('div', 'contents-segment');
             bytesNode.dataset.kind = expanded.kind;
-            bytesNode.append(element('strong', '', `File bytes [${expanded.mapping.logical}, ${expanded.mapping.logical + expanded.size})`), element('span', 'region-meta', `${expanded.mapping.storage} · ${bytes(expanded.size)}`));
+            bytesNode.append(element('strong', '', `File bytes [${expanded.mapping.logical}, ${expanded.mapping.logical + expanded.mapping.length})`), element('span', 'region-meta', `${bytes(expanded.mapping.length)} logical · ${bytes(expanded.mapping.physicalLength ?? expanded.size)} stored · ${expanded.mapping.storage}`));
             content.strip.append(bytesNode);
         }
     }
@@ -414,12 +403,44 @@ function closeDock() {
     hideTooltip();
     scheduleZoom();
 }
+function syncControls(o) {
+    $('xattr-filter').checked = o.xattrFilter === 'on';
+    $('prefix-storage').checked = o.prefixStorage === 'standalone';
+    $('xattr-inline').checked = ['inline', 'shared'].includes(o.xattrs);
+    $('xattr-shared').checked = ['shared', 'shared-only'].includes(o.xattrs);
+    const chunked = o.dataLayout === 'chunked';
+    const compressed = o.dataLayout === 'lz4';
+    $('format-label').textContent = compressed ? 'LZ4 EROFS' : 'Uncompressed EROFS';
+    for (const input of document.querySelectorAll('input[name="inode-format"]')) input.checked = input.value === o.format;
+    $('chunk-bits').max = maxChunkBits(o.blockSize);
+    $('device-mode').querySelector('option[value="unified"]').disabled = true;
+    $('lz4-options').hidden = !compressed;
+    $('ztailpacking').disabled = !compressed;
+    $('compression-index').disabled = !compressed;
+    for (const [name, id] of Object.entries(optionIds)) $(id).value = o[name];
+    for (const [name, id] of Object.entries(booleanIds)) $(id).checked = Boolean(o[name]);
+    $('flat-options').hidden = o.dataLayout !== 'flat';
+    $('inline-toggle').disabled = o.dataLayout !== 'flat';
+    $('chunk-options').hidden = !chunked;
+    $('chunk-format').disabled = !chunked;
+    $('chunk-bits').disabled = !chunked;
+    $('device-mode').disabled = !chunked;
+    $('chunk-sharing').disabled = !chunked || o.chunkBits !== 0 || o.blockSize > 4096;
+    $('chunk-format').querySelector('option[value="blockmap"]').disabled = o.deviceMode === 'explicit';
+    $('device-note').hidden = o.deviceMode !== 'explicit';
+    $('chunk-sharing').setAttribute('aria-describedby', 'sharing-note');
+    $('xattr-options').hidden = o.xattrs === 'none';
+    $('prefix-storage').disabled = o.xattrs === 'none';
+    $('xattr-filter').disabled = o.xattrs === 'none';
+    $('xattr-summary').textContent = { none: 'None', inline: 'Inline', shared: 'Inline + Shared', 'shared-only': 'Shared' }[o.xattrs];
+    $('chunk-size-note').textContent = `Chunk size: ${bytes(o.blockSize * 2 ** o.chunkBits)} (${o.blockSize} × 2^${o.chunkBits}).`;
+}
 const optionIds = {
     dataLayout: 'data-layout', chunkFormat: 'chunk-format', blockSize: 'block-size', chunkBits: 'chunk-bits',
-    deviceMode: 'device-mode',
+    deviceMode: 'device-mode', compressionIndex: 'compression-index',
 };
-const booleanIds = { inline: 'inline-toggle', sharing: 'chunk-sharing' };
-function updatePreset(event) {
+const booleanIds = { inline: 'inline-toggle', sharing: 'chunk-sharing', ztailpacking: 'ztailpacking' };
+async function updatePreset(event) {
     const control = event?.target;
     if (control?.name === 'inode-format') preferredOptions.format = control.value;
     for (const [name, id] of Object.entries(optionIds)) if (control?.id === id) preferredOptions[name] = control.value;
@@ -433,34 +454,28 @@ function updatePreset(event) {
     }
     const raw = { ...preferredOptions, mtime: true, counts: 'normal', sampleSize: 'mixed', directoryLayout: 'inline', nameEncoding: 'ascii', nameEnding: 'packed', xattrNamespace: 'user', sharedStorage: 'primary', sbExtension: false, imageShare: false };
     if (raw.prefixStorage !== 'standalone') raw.prefixStorage = 'off';
+    const version = ++loadVersion;
+    grid.setAttribute('aria-busy', 'true');
     let next;
-    try { next = createLayout(raw); }
-    catch (error) { $('option-error').textContent = error.message; $('option-error').hidden = false; return; }
+    try {
+        const requested = normalizeOptions(raw);
+        syncControls(requested);
+        next = await createLayout(requested);
+    }
+    catch (error) {
+        if (version !== loadVersion) return;
+        grid.setAttribute('aria-busy', 'false');
+        $('option-error').textContent = error.message;
+        $('option-error').hidden = false;
+        return;
+    }
+    if (version !== loadVersion) return;
+    grid.setAttribute('aria-busy', 'false');
     $('option-error').hidden = true;
     layout = next;
     const o = layout.options;
-    $('xattr-filter').checked = o.xattrFilter === 'on';
-    $('prefix-storage').checked = o.prefixStorage === 'standalone';
-    $('xattr-inline').checked = ['inline', 'shared'].includes(o.xattrs);
-    $('xattr-shared').checked = ['shared', 'shared-only'].includes(o.xattrs);
     const chunked = o.dataLayout === 'chunked';
-    for (const [name, id] of Object.entries(optionIds)) $(id).value = o[name];
-    for (const [name, id] of Object.entries(booleanIds)) $(id).checked = Boolean(o[name]);
-    $('flat-options').hidden = chunked;
-    $('inline-toggle').disabled = chunked;
-    $('chunk-options').hidden = !chunked;
-    $('chunk-format').disabled = !chunked;
-    $('chunk-bits').disabled = !chunked;
-    $('device-mode').disabled = !chunked;
-    $('chunk-sharing').disabled = !chunked || o.chunkBits !== 0 || o.sampleSize !== 'mixed';
-    $('chunk-format').querySelector('option[value="blockmap"]').disabled = o.deviceMode === 'explicit';
-    $('device-note').hidden = o.deviceMode !== 'explicit';
-    $('chunk-sharing').setAttribute('aria-describedby', 'sharing-note');
-    $('xattr-options').hidden = o.xattrs === 'none';
-    $('prefix-storage').disabled = o.xattrs === 'none';
-    $('xattr-filter').disabled = o.xattrs === 'none';
-    $('xattr-summary').textContent = { none: 'None', inline: 'Inline', shared: 'Inline + Shared', 'shared-only': 'Shared' }[o.xattrs];
-    $('chunk-size-note').textContent = `Chunk size: ${bytes(o.blockSize * 2 ** o.chunkBits)} (${o.blockSize} × 2^${o.chunkBits}).`;
+    const compressed = o.dataLayout === 'lz4';
     makeDerivedRegions(); renderExampleTree(); hideTooltip();
     if (!layout.addressSpaces.some(space => space.id === activeSpace)) activeSpace = 'primary';
     if (selectedId && !regionById(selectedId)) {
@@ -477,7 +492,8 @@ function updatePreset(event) {
     if (selectedFieldKey && !selected?.fields.some(field => `${field.name}:${field.offset}` === selectedFieldKey)) selectedFieldKey = null;
     renderDiagram(); if (!dock.hidden) renderDock();
     const xattrDescription = { none: 'No xattrs.', inline: 'Local xattrs.', shared: 'Local and shared xattrs.', 'shared-only': 'Shared xattr IDs only.' }[o.xattrs];
-    $('layout-status').textContent = `${o.format === 'compact' ? 'Compact · 32 B' : 'Extended · 64 B'} inodes. ${chunked ? `Chunked · ${o.chunkFormat === 'indexes' ? '8-byte indexes' : '4-byte block map'}.` : `${o.inline ? 'Eligible inline' : 'External'} file tails.`} ${xattrDescription} Directory data: ${o.directoryLayout}.`;
+    const compressedFiles = layout.regions.filter(region => region.kind === 'inode' && [1, 3].includes((Number(region.fields.find(field => field.name === 'i_format')?.value) >> 1) & 7)).length;
+    $('layout-status').textContent = `${o.format === 'compact' ? 'Compact · 32 B' : 'Extended · 64 B'} inodes. ${compressed ? `LZ4 · ${o.compressionIndex === 'full' ? 'Full' : 'Compact'} indexes · compressed tail inlining ${o.ztailpacking ? 'enabled' : 'disabled'} · ${compressedFiles} of 3 files compressed.` : chunked ? `Chunked · ${o.chunkFormat === 'indexes' ? '8-byte indexes' : '4-byte block map'}.` : `${o.inline ? 'Eligible inline' : 'External'} file tails.`} ${xattrDescription}`;
 }
 
 document.querySelectorAll('input[name="inode-format"]').forEach(input => input.addEventListener('change', updatePreset));

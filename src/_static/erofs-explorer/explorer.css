@@ -44,7 +44,7 @@ h1, h2, h3, p { margin-top: 0; }
 h1 { font-size: clamp(25px, 2.5vw, 36px); line-height: 1.2; letter-spacing: -0.035em; margin-bottom: 10px; font-weight: 650; }
 .intro-copy { color: var(--muted); font-size: 14px; margin: 0; }
 .format-badge { display: flex; align-items: center; gap: 8px; white-space: nowrap; background: var(--dir-bg); color: var(--dir-text); border: 1px solid var(--dir-line); padding: 7px 12px; border-radius: 30px; font-size: 11px; font-weight: 600; }
-.format-badge span { width: 6px; height: 6px; border-radius: 50%; background: var(--dir-text); }
+.format-badge > [aria-hidden="true"] { width: 6px; height: 6px; border-radius: 50%; background: var(--dir-text); }
 .workspace { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 22px; }
 .map-panel { min-width: 0; padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
 .segmented { display: flex; padding: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; }
@@ -222,9 +222,13 @@ td { padding: 11px 4px; vertical-align: top; border-bottom: 1px solid var(--line
 #reset-options { display: block; width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--muted); font-size: 11px; }
 select:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 [data-kind="chunk-index"] { --region-bg: #e3f4fc; --region-line: #83bcd3; --region-text: #22627d; }
+[data-kind="compressed-index"] { --region-bg: #e8eaff; --region-line: #a0a6e3; --region-text: #4c509c; }
+[data-kind="compressed-data"] { --region-bg: #eaf3d6; --region-line: #adbf7b; --region-text: #506d28; }
 [data-kind="xattr"] { --region-bg: #fbe9f5; --region-line: #d6a2c7; --region-text: #87426f; }
 @media (prefers-color-scheme: dark) {
     [data-kind="chunk-index"] { --region-bg: #203b4b; --region-line: #497f98; --region-text: #a9d9ef; }
+    [data-kind="compressed-index"] { --region-bg: #2d304e; --region-line: #6d75ad; --region-text: #c5cbff; }
+    [data-kind="compressed-data"] { --region-bg: #303d22; --region-line: #758e4d; --region-text: #cee9a7; }
     [data-kind="xattr"] { --region-bg: #402d3c; --region-line: #8a5d7e; --region-text: #e6b6d7; }
 }
 @media (max-width: 900px) {

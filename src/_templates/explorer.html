@@ -15,10 +15,10 @@
     <span class="topbar-divider" aria-hidden="true"></span><span class="app-name">Layout explorer</span>
     <a class="docs-link" href="{{ pathto('ondisk/index') }}">Documentation <span aria-hidden="true">↗</span></a>
   </header>
-  <main id="explorer" data-doc-url="{{ pathto('ondisk/core_ondisk') }}" data-doc-xattrs="{{ pathto('ondisk/xattrs') }}" data-doc-chunked="{{ pathto('ondisk/chunked_format') }}">
+  <main id="explorer" data-doc-url="{{ pathto('ondisk/core_ondisk') }}" data-doc-xattrs="{{ pathto('ondisk/xattrs') }}" data-doc-chunked="{{ pathto('ondisk/chunked_format') }}" data-doc-compressed="{{ pathto('ondisk/compressed_format') }}">
     <section class="intro">
       <div><p class="eyebrow">INSIDE THE FILESYSTEM</p><h1>Explore the on-disk layout.</h1><p class="intro-copy">Hover for a summary. Select a region to inspect its fields and follow its references.</p></div>
-      <span class="format-badge"><span aria-hidden="true"></span> Uncompressed EROFS</span>
+      <span class="format-badge"><span aria-hidden="true"></span><span id="format-label">Uncompressed EROFS</span></span>
     </section>
     <div class="explorer-shell">
       <details class="options-dock" id="options-dock" open>
@@ -44,21 +44,26 @@
               <label class="option-label" for="block-size">Filesystem block size</label>
               <select id="block-size"><option value="512">512 B</option><option value="4096" selected>4 KiB</option><option value="16384">16 KiB</option></select>
               <label class="option-label" for="data-layout">Data layout</label>
-            <select id="data-layout"><option value="flat">Flat</option><option value="chunked">Chunk-based</option></select>
+            <select id="data-layout"><option value="flat">Flat</option><option value="chunked">Chunk-based</option><option value="lz4">LZ4 compressed</option></select>
               <div id="flat-options" class="option-children">
                 <label class="inline-control"><input type="checkbox" id="inline-toggle" checked><span>Inline file tails</span></label>
               </div>
+              <div id="lz4-options" class="option-children" hidden>
+                <label class="inline-control"><input type="checkbox" id="ztailpacking"><span>Inline compressed tails</span></label>
+                <label class="option-label" for="compression-index">Compression index format</label>
+                <select id="compression-index"><option value="compact">Compact indexes</option><option value="full">Full indexes</option></select>
+              </div>
               <div id="chunk-options" class="option-children" hidden>
                 <label class="option-label" for="chunk-bits">Chunk size exponent</label>
-                <input id="chunk-bits" type="number" min="0" max="31" step="1" value="0">
+                <input id="chunk-bits" type="number" min="0" max="18" step="1" value="0">
                 <p class="option-note" id="chunk-size-note"></p>
                 <label class="option-label" for="chunk-format">Chunk entry format</label>
               <select id="chunk-format" disabled><option value="blockmap">Block map · 4 B</option><option value="indexes">Chunk index · 8 B</option></select>
                 <label class="option-label" for="device-mode">Data devices</label>
-              <select id="device-mode"><option value="primary">Primary device only</option><option value="unified">Extra device · unified</option><option value="explicit">Extra device · explicit ID</option></select>
+              <select id="device-mode"><option value="primary">Primary device only</option><option value="unified" disabled>Extra device · unified (unavailable)</option><option value="explicit">Extra device · explicit ID</option></select>
                 <p class="option-note" id="device-note" hidden>Explicit device IDs require 8-byte chunk indexes; the entry format is selected automatically.</p>
-                <label class="inline-control"><input id="chunk-sharing" type="checkbox"><span>Share a chunk</span></label>
-                <p class="option-note" id="sharing-note">Requires block-sized chunks.</p>
+                <label class="inline-control"><input id="chunk-sharing" type="checkbox"><span>Share B/C first chunk</span></label>
+                <p class="option-note" id="sharing-note">Uses matching first chunks in B and C; requires block-sized chunks of 512 B or 4 KiB.</p>
               </div>
             </fieldset>
           </div>
@@ -84,7 +89,6 @@
     <div class="workspace" id="workspace">
       <section class="map-panel" aria-label="Filesystem structure diagram">
         <div class="array-heading"><h2>Filesystem structure</h2><p id="diagram-space-label">Primary image · 4 KiB blocks</p></div>
-        <p id="layout-provenance" class="map-note" role="status"></p>
         <div id="space-tabs" class="space-tabs" aria-label="Address space" hidden></div>
         <p class="diagram-scroll-hint">Scroll sideways to explore the whole layout →</p>
         <div id="diagram-scroll" class="diagram-scroll">
@@ -97,8 +101,7 @@
         └── c</pre><p>Enable JavaScript to inspect the directory and file regions. <a href="{{ pathto('ondisk/core_ondisk') }}">Read the format description</a>.</p></div>
         </div>
         </div>
-        <div class="legend" aria-label="Region types"><span data-kind="superblock">Superblock</span><span data-kind="inode">Inode</span><span data-kind="directory">Directory entries</span><span data-kind="data">File data</span><span data-kind="inline">Inline data</span><span data-kind="chunk-index">Chunk index</span><span data-kind="xattr">Xattrs</span><span data-kind="device-table">Device table</span><span data-kind="unused">Unused</span></div>
-        <p class="map-note">Widths are schematic, not to scale. Sloping lines expand the highlighted interval into the next row. An inode and its external data may occupy separate intervals.</p>
+        <div class="legend" aria-label="Region types"><span data-kind="superblock">Superblock</span><span data-kind="inode">Inode</span><span data-kind="directory">Directory entries</span><span data-kind="data">File data</span><span data-kind="inline">Inline data</span><span data-kind="chunk-index">Chunk index</span><span data-kind="compressed-index">Compression index</span><span data-kind="compressed-data">Compressed data</span><span data-kind="xattr">Xattrs</span><span data-kind="device-table">Device table</span><span data-kind="unused">Unused</span></div>
         <p id="layout-status" class="layout-status" role="status" aria-live="polite" aria-atomic="true">Compact inodes · Inline file tails</p>
       </section>
       <aside id="details-dock" class="details-dock" aria-labelledby="dock-title" hidden>
@@ -108,7 +111,7 @@
           <dl class="region-metrics"><div><dt id="offset-label">Byte offset</dt><dd id="dock-offset"></dd></div><div><dt>Size</dt><dd id="dock-size"></dd></div><div class="space-metric"><dt>Address space</dt><dd id="dock-space"></dd></div></dl>
           <section id="references-section" hidden><h3>Related regions</h3><div id="dock-references" class="reference-list"></div></section>
           <section id="formula-section" hidden><h3>Address calculation</h3><code id="dock-formula" class="formula"></code></section>
-          <section id="fields-section" hidden><h3>On-disk fields</h3><p class="section-hint">Offsets are relative to the structure. Values are illustrative.</p><div class="table-scroll"><table id="field-table"><thead><tr><th>Field / offset</th><th>Bytes</th><th>Value</th></tr></thead><tbody></tbody></table></div></section>
+          <section id="fields-section" hidden><h3>On-disk fields</h3><p class="section-hint">Offsets are relative to the structure. Values come from the recorded image.</p><div class="table-scroll"><table id="field-table"><thead><tr><th>Field / offset</th><th>Bytes</th><th>Value</th></tr></thead><tbody></tbody></table></div></section>
           <section id="entries-section" hidden><h3>Directory entries</h3><p class="section-hint">Follow a NID to inspect its inode.</p><div class="table-scroll"><table id="directory-table"><thead><tr><th>Name</th><th>nameoff</th><th>Target NID</th></tr></thead><tbody></tbody></table></div></section>
           <section id="mapping-section" hidden><h3>File data mapping</h3><dl id="mapping-details" class="mapping-details"></dl><p id="mapping-note" class="section-hint">Flat files map directly from their inode. There is no separate file index table.</p></section>
           <p id="dock-note" class="dock-note" hidden></p>
@@ -117,7 +120,7 @@
       </aside>
     </div>
     </div>
-    <footer class="page-footer"><span>EROFS filesystem project</span><span>Example placement · EROFS on-disk format</span></footer>
+    <footer class="page-footer"><span>EROFS filesystem project</span><span>Recorded images · EROFS on-disk format</span></footer>
   </main>
   <div id="region-tooltip" role="tooltip" class="region-tooltip" hidden></div>
 </body>

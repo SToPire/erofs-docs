@@ -35,6 +35,9 @@ Optional features extend this foundation without breaking the core design:
 - **{doc}`Chunk-based layout <chunked_format>`** splits large files into
   fixed-size, independently-addressed chunks, enabling cross-file deduplication
   and multi-device storage.
+- **{doc}`LZ4 compressed layout <compressed_format>`** maps logical file extents
+  through compression indexes to physical clusters, with recorded default-LZ4
+  examples in the Layout Explorer.
 
 ```{toctree}
 :hidden:
@@ -42,4 +45,5 @@ explorer
 core_ondisk
 xattrs
 chunked_format
+compressed_format
 ```
